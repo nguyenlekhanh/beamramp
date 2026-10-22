@@ -1,0 +1,286 @@
+{
+  "schema": "crs.scenario/1",
+  "name": "Hammer Challenge",
+  "seed": 12345,
+  "duration_seconds": 28.0,
+  "camera": {
+    "style": "cinematic_auto"
+  },
+  "sim": {
+    "recovery": true,
+    "slowmo": {
+      "enabled": true,
+      "factor": 0.4
+    }
+  },
+  "track": {
+    "type": "hammer_challenge",
+    "params": {
+      "length": 180.0,
+      "road_width": 26.0,
+      "obstacle_count": 5
+    }
+  },
+  "vehicles": {
+    "count": 3,
+    "specs": [
+      {
+        "type": "compact",
+        "color": "#118ab2",
+        "wheel_color": "#22223b",
+        "label": "Car 1",
+        "scale": 1.0,
+        "mass_override": null,
+        "spawn_offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "spawn_yaw_deg": 0.0,
+        "style": "balanced"
+      },
+      {
+        "type": "compact",
+        "color": "#1d71f2",
+        "wheel_color": "#22223b",
+        "label": "Car 2",
+        "scale": 1.0,
+        "mass_override": null,
+        "spawn_offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "spawn_yaw_deg": 0.0,
+        "style": "aggressive"
+      },
+      {
+        "type": "compact",
+        "color": "#fb5607",
+        "wheel_color": "#22223b",
+        "label": "Car 3",
+        "scale": 1.0,
+        "mass_override": null,
+        "spawn_offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "spawn_yaw_deg": 0.0,
+        "style": "cautious"
+      }
+    ]
+  },
+  "output": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "quality": "medium",
+    "out_dir": null,
+    "out_file": "colorrush_render.mp4",
+    "music_path": null,
+    "music_volume": 0.35,
+    "sfx_enabled": true
+  },
+  "layout": {
+    "meta": {
+      "segment_count": 1,
+      "arena": {
+        "size": [
+          300.0,
+          104.0
+        ]
+      },
+      "sky": {
+        "energy": 1.5,
+        "top_color": "#8ecae6",
+        "ground_color": "#f1faee"
+      },
+      "sun": {
+        "rotation_deg": [
+          -38.0,
+          -25.0
+        ],
+        "energy": 1.2
+      },
+      "duration_hint": 28
+    },
+    "road": [
+      {
+        "kind": "platform",
+        "from": [
+          90.0,
+          0.25,
+          0.0
+        ],
+        "size": [
+          216.0,
+          0.5,
+          26.0
+        ],
+        "color": "#495057"
+      }
+    ],
+    "obstacles": [
+      {
+        "type": "hammer",
+        "at": [
+          45.714285714285715,
+          9.5,
+          7.8
+        ],
+        "arm_len": 9.0,
+        "head_size": 3.4,
+        "swing_sec": 2.726098695622527,
+        "phase_deg": 96.25174554507186
+      },
+      {
+        "type": "hammer",
+        "at": [
+          71.42857142857143,
+          9.5,
+          -7.8
+        ],
+        "arm_len": 9.0,
+        "head_size": 3.4,
+        "swing_sec": 2.9722693061211864,
+        "phase_deg": 59.595657505974465
+      },
+      {
+        "type": "hammer",
+        "at": [
+          97.14285714285714,
+          9.5,
+          7.8
+        ],
+        "arm_len": 9.0,
+        "head_size": 3.4,
+        "swing_sec": 2.6511826198586093,
+        "phase_deg": 85.65298174318005
+      },
+      {
+        "type": "hammer",
+        "at": [
+          122.85714285714286,
+          9.5,
+          -7.8
+        ],
+        "arm_len": 9.0,
+        "head_size": 3.4,
+        "swing_sec": 2.693871606104373,
+        "phase_deg": 74.72930802029757
+      },
+      {
+        "type": "hammer",
+        "at": [
+          148.57142857142858,
+          9.5,
+          7.8
+        ],
+        "arm_len": 9.0,
+        "head_size": 3.4,
+        "swing_sec": 2.4176721086456743,
+        "phase_deg": 43.348868246655165
+      },
+      {
+        "type": "cone",
+        "at": [
+          14.0,
+          0.4,
+          10.4
+        ]
+      },
+      {
+        "type": "cone",
+        "at": [
+          23.0,
+          0.4,
+          10.4
+        ]
+      },
+      {
+        "type": "cone",
+        "at": [
+          32.0,
+          0.4,
+          10.4
+        ]
+      },
+      {
+        "type": "cone",
+        "at": [
+          41.0,
+          0.4,
+          10.4
+        ]
+      }
+    ],
+    "zones": [
+      {
+        "type": "checkpoint",
+        "at": [
+          90.0,
+          0.0,
+          -16.0
+        ],
+        "size": [
+          26.0,
+          0.5,
+          26.0
+        ]
+      },
+      {
+        "type": "finish",
+        "at": [
+          206.0,
+          0.0,
+          0.0
+        ],
+        "size": [
+          8.0,
+          4.0,
+          26.0
+        ]
+      }
+    ],
+    "spawns": [
+      [
+        6.0,
+        0.05,
+        -8.779828170601586
+      ],
+      [
+        6.0,
+        0.05,
+        0.8721014246210832
+      ],
+      [
+        6.0,
+        0.05,
+        8.592705030657367
+      ]
+    ],
+    "camera_hints": {
+      "start": [
+        0.0,
+        9.0,
+        -34.0
+      ],
+      "mid1": [
+        62.99999999999999,
+        14.0,
+        -40.0
+      ],
+      "mid2": [
+        117.0,
+        14.0,
+        -40.0
+      ],
+      "finish": [
+        200.0,
+        9.0,
+        -30.0
+      ]
+    }
+  }
+}

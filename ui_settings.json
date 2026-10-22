@@ -1,0 +1,14 @@
+{
+  "template_id": "mega_ramp",
+  "aspect": "9:16",
+  "resolution": "1080p",
+  "fps": 30,
+  "quality": "medium",
+  "duration": null,
+  "vehicle_count": null,
+  "vehicle_type": null,
+  "color": null,
+  "seed": 12345,
+  "out_dir": "C:\\khanh\\python\\39 godotBeamNg\\output\\ui_renders",
+  "file_name": ""
+}

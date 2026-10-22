@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Godot
+godot_project/.godot/
+godot_project/export*/
+
+# Render artifacts & temp
+output/
+temp/
+*.avi
+*.mp4
+frame*/	/
+frames/
+*.png.render.log
+
+# Tools (godot binaries)
+tools/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# App data
+app_state.json

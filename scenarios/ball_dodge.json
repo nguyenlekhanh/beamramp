@@ -1,0 +1,284 @@
+{
+  "schema": "crs.scenario/1",
+  "name": "Ball Dodge",
+  "seed": 12345,
+  "duration_seconds": 30.0,
+  "camera": {
+    "style": "cinematic_auto"
+  },
+  "sim": {
+    "recovery": true,
+    "slowmo": {
+      "enabled": true,
+      "factor": 0.4
+    }
+  },
+  "track": {
+    "type": "ball_dodge",
+    "params": {
+      "length": 200.0,
+      "road_width": 30.0,
+      "obstacle_count": 6
+    }
+  },
+  "vehicles": {
+    "count": 3,
+    "specs": [
+      {
+        "type": "compact",
+        "color": "#118ab2",
+        "wheel_color": "#22223b",
+        "label": "Car 1",
+        "scale": 1.0,
+        "mass_override": null,
+        "spawn_offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "spawn_yaw_deg": 0.0,
+        "style": "balanced"
+      },
+      {
+        "type": "compact",
+        "color": "#1d71f2",
+        "wheel_color": "#22223b",
+        "label": "Car 2",
+        "scale": 1.0,
+        "mass_override": null,
+        "spawn_offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "spawn_yaw_deg": 0.0,
+        "style": "aggressive"
+      },
+      {
+        "type": "compact",
+        "color": "#fb5607",
+        "wheel_color": "#22223b",
+        "label": "Car 3",
+        "scale": 1.0,
+        "mass_override": null,
+        "spawn_offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "spawn_yaw_deg": 0.0,
+        "style": "cautious"
+      }
+    ]
+  },
+  "output": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "quality": "medium",
+    "out_dir": null,
+    "out_file": "colorrush_render.mp4",
+    "music_path": null,
+    "music_volume": 0.35,
+    "sfx_enabled": true
+  },
+  "layout": {
+    "meta": {
+      "segment_count": 1,
+      "arena": {
+        "size": [
+          320.0,
+          120.0
+        ]
+      },
+      "sky": {
+        "energy": 1.5,
+        "top_color": "#8ecae6",
+        "ground_color": "#f1faee"
+      },
+      "sun": {
+        "rotation_deg": [
+          -38.0,
+          -25.0
+        ],
+        "energy": 1.2
+      },
+      "duration_hint": 30
+    },
+    "road": [
+      {
+        "kind": "platform",
+        "from": [
+          100.0,
+          0.25,
+          0.0
+        ],
+        "size": [
+          240.0,
+          0.5,
+          30.0
+        ],
+        "color": "#495057"
+      }
+    ],
+    "obstacles": [
+      {
+        "type": "ball",
+        "at": [
+          47.0,
+          2.6,
+          16.5
+        ],
+        "radius": 2.8747492264901826,
+        "push": [
+          0.0,
+          0.0,
+          -1.0
+        ],
+        "speed": 12.160796818275903
+      },
+      {
+        "type": "ball",
+        "at": [
+          72.0,
+          2.6,
+          -16.5
+        ],
+        "radius": 2.912729219538307,
+        "push": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "speed": 13.89220094010841
+      },
+      {
+        "type": "ball",
+        "at": [
+          97.0,
+          2.6,
+          16.5
+        ],
+        "radius": 3.1441001604357486,
+        "push": [
+          0.0,
+          0.0,
+          -1.0
+        ],
+        "speed": 13.486893577872056
+      },
+      {
+        "type": "ball",
+        "at": [
+          122.0,
+          2.6,
+          -16.5
+        ],
+        "radius": 2.943738040359303,
+        "push": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "speed": 12.943240057278407
+      },
+      {
+        "type": "ball",
+        "at": [
+          147.0,
+          2.6,
+          16.5
+        ],
+        "radius": 2.2715091384798383,
+        "push": [
+          0.0,
+          0.0,
+          -1.0
+        ],
+        "speed": 12.05296511279457
+      },
+      {
+        "type": "ball",
+        "at": [
+          172.0,
+          2.6,
+          -16.5
+        ],
+        "radius": 3.1464500021570343,
+        "push": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "speed": 11.469230000824735
+      }
+    ],
+    "zones": [
+      {
+        "type": "checkpoint",
+        "at": [
+          100.0,
+          0.0,
+          -18.0
+        ],
+        "size": [
+          30.0,
+          0.5,
+          30.0
+        ]
+      },
+      {
+        "type": "finish",
+        "at": [
+          228.0,
+          0.0,
+          0.0
+        ],
+        "size": [
+          8.0,
+          4.0,
+          30.0
+        ]
+      }
+    ],
+    "spawns": [
+      [
+        6.0,
+        0.05,
+        -7.6516365479120925
+      ],
+      [
+        6.0,
+        0.05,
+        0.8991429417601426
+      ],
+      [
+        6.0,
+        0.05,
+        8.514858430988088
+      ]
+    ],
+    "camera_hints": {
+      "start": [
+        0.0,
+        9.0,
+        -34.0
+      ],
+      "mid1": [
+        60.0,
+        10.0,
+        -18.0
+      ],
+      "mid2": [
+        120.0,
+        10.0,
+        -18.0
+      ],
+      "finish": [
+        220.0,
+        10.0,
+        -30.0
+      ]
+    }
+  }
+}

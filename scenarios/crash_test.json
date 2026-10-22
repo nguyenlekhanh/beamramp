@@ -1,0 +1,445 @@
+{
+  "schema": "crs.scenario/1",
+  "name": "Crash Test",
+  "seed": 12345,
+  "duration_seconds": 18.0,
+  "camera": {
+    "style": "cinematic_auto"
+  },
+  "sim": {
+    "recovery": true,
+    "slowmo": {
+      "enabled": true,
+      "factor": 0.4
+    }
+  },
+  "track": {
+    "type": "crash_test",
+    "params": {
+      "run_length": 90.0,
+      "road_width": 24.0,
+      "wall_rows": 3,
+      "wall_cols": 6
+    }
+  },
+  "vehicles": {
+    "count": 2,
+    "specs": [
+      {
+        "type": "compact",
+        "color": "#118ab2",
+        "wheel_color": "#22223b",
+        "label": "Car 1",
+        "scale": 1.0,
+        "mass_override": null,
+        "spawn_offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "spawn_yaw_deg": 0.0,
+        "style": "balanced"
+      },
+      {
+        "type": "compact",
+        "color": "#1d71f2",
+        "wheel_color": "#22223b",
+        "label": "Car 2",
+        "scale": 1.0,
+        "mass_override": null,
+        "spawn_offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "spawn_yaw_deg": 0.0,
+        "style": "aggressive"
+      }
+    ]
+  },
+  "output": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "quality": "medium",
+    "out_dir": null,
+    "out_file": "colorrush_render.mp4",
+    "music_path": null,
+    "music_volume": 0.35,
+    "sfx_enabled": true
+  },
+  "layout": {
+    "meta": {
+      "segment_count": 1,
+      "arena": {
+        "size": [
+          250.0,
+          96.0
+        ]
+      },
+      "sky": {
+        "energy": 1.5,
+        "top_color": "#8ecae6",
+        "ground_color": "#f1faee"
+      },
+      "sun": {
+        "rotation_deg": [
+          -38.0,
+          -25.0
+        ],
+        "energy": 1.2
+      },
+      "duration_hint": 18
+    },
+    "road": [
+      {
+        "kind": "platform",
+        "from": [
+          45.0,
+          0.25,
+          0.0
+        ],
+        "size": [
+          120.0,
+          0.5,
+          24.0
+        ],
+        "color": "#343a40"
+      }
+    ],
+    "obstacles": [
+      {
+        "type": "crash_wall",
+        "at": [
+          82.0,
+          0.9,
+          -9.0
+        ],
+        "size": [
+          3.3,
+          1.9,
+          3.5
+        ]
+      },
+      {
+        "type": "crash_wall",
+        "at": [
+          82.0,
+          0.9,
+          -5.4
+        ],
+        "size": [
+          3.3,
+          1.9,
+          3.5
+        ]
+      },
+      {
+        "type": "crash_wall",
+        "at": [
+          82.0,
+          0.9,
+          -1.8
+        ],
+        "size": [
+          3.3,
+          1.9,
+          3.5
+        ]
+      },
+      {
+        "type": "crash_wall",
+        "at": [
+          82.0,
+          0.9,
+          1.8
+        ],
+        "size": [
+          3.3,
+          1.9,
+          3.5
+        ]
+      },
+      {
+        "type": "crash_wall",
+        "at": [
+          82.0,
+          0.9,
+          5.4
+        ],
+        "size": [
+          3.3,
+          1.9,
+          3.5
+        ]
+      },
+      {
+        "type": "crash_wall",
+        "at": [
+          82.0,
+          0.9,
+          9.0
+        ],
+        "size": [
+          3.3,
+          1.9,
+          3.5
+        ]
+      },
+      {
+        "type": "crash_wall",
+        "at": [
+          82.0,
+          2.8,
+          -9.0
+        ],
+        "size": [
+          3.3,
+          1.9,
+          3.5
+        ]
+      },
+      {
+        "type": "crash_wall",
+        "at": [
+          82.0,
+          2.8,
+          -5.4
+        ],
+        "size": [
+          3.3,
+          1.9,
+          3.5
+        ]
+      },
+      {
+        "type": "crash_wall",
+        "at": [
+          82.0,
+          2.8,
+          -1.8
+        ],
+        "size": [
+          3.3,
+          1.9,
+          3.5
+        ]
+      },
+      {
+        "type": "crash_wall",
+        "at": [
+          82.0,
+          2.8,
+          1.8
+        ],
+        "size": [
+          3.3,
+          1.9,
+          3.5
+        ]
+      },
+      {
+        "type": "crash_wall",
+        "at": [
+          82.0,
+          2.8,
+          5.4
+        ],
+        "size": [
+          3.3,
+          1.9,
+          3.5
+        ]
+      },
+      {
+        "type": "crash_wall",
+        "at": [
+          82.0,
+          2.8,
+          9.0
+        ],
+        "size": [
+          3.3,
+          1.9,
+          3.5
+        ]
+      },
+      {
+        "type": "crash_wall",
+        "at": [
+          82.0,
+          4.7,
+          -9.0
+        ],
+        "size": [
+          3.3,
+          1.9,
+          3.5
+        ]
+      },
+      {
+        "type": "crash_wall",
+        "at": [
+          82.0,
+          4.7,
+          -5.4
+        ],
+        "size": [
+          3.3,
+          1.9,
+          3.5
+        ]
+      },
+      {
+        "type": "crash_wall",
+        "at": [
+          82.0,
+          4.7,
+          -1.8
+        ],
+        "size": [
+          3.3,
+          1.9,
+          3.5
+        ]
+      },
+      {
+        "type": "crash_wall",
+        "at": [
+          82.0,
+          4.7,
+          1.8
+        ],
+        "size": [
+          3.3,
+          1.9,
+          3.5
+        ]
+      },
+      {
+        "type": "crash_wall",
+        "at": [
+          82.0,
+          4.7,
+          5.4
+        ],
+        "size": [
+          3.3,
+          1.9,
+          3.5
+        ]
+      },
+      {
+        "type": "crash_wall",
+        "at": [
+          82.0,
+          4.7,
+          9.0
+        ],
+        "size": [
+          3.3,
+          1.9,
+          3.5
+        ]
+      },
+      {
+        "type": "barrier",
+        "at": [
+          100.0,
+          1.0,
+          -6.0
+        ],
+        "size": [
+          1.0,
+          2.0,
+          3.5
+        ],
+        "rot_deg": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "type": "barrier",
+        "at": [
+          100.0,
+          1.0,
+          6.0
+        ],
+        "size": [
+          1.0,
+          2.0,
+          3.5
+        ],
+        "rot_deg": [
+          0,
+          0,
+          0
+        ]
+      }
+    ],
+    "zones": [
+      {
+        "type": "checkpoint",
+        "at": [
+          36.0,
+          0.0,
+          -15.0
+        ],
+        "size": [
+          24.0,
+          0.5,
+          24.0
+        ]
+      },
+      {
+        "type": "finish",
+        "at": [
+          104.0,
+          0.0,
+          0.0
+        ],
+        "size": [
+          8.0,
+          4.0,
+          24.0
+        ]
+      }
+    ],
+    "spawns": [
+      [
+        6.0,
+        0.05,
+        -9.645433207069782
+      ],
+      [
+        6.0,
+        0.05,
+        7.411639295712662
+      ]
+    ],
+    "camera_hints": {
+      "start": [
+        4.5,
+        8.0,
+        -32.0
+      ],
+      "mid1": [
+        58.0,
+        16.0,
+        -38.0
+      ],
+      "detail": [
+        88.0,
+        10.0,
+        -26.0
+      ],
+      "finish": [
+        102.0,
+        9.0,
+        -30.0
+      ]
+    }
+  }
+}

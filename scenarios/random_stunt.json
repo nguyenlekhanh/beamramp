@@ -1,0 +1,317 @@
+{
+  "schema": "crs.scenario/1",
+  "name": "Random Stunt",
+  "seed": 12345,
+  "duration_seconds": 24.0,
+  "camera": {
+    "style": "cinematic_auto"
+  },
+  "sim": {
+    "recovery": true,
+    "slowmo": {
+      "enabled": true,
+      "factor": 0.4
+    }
+  },
+  "track": {
+    "type": "random_stunt",
+    "params": {}
+  },
+  "vehicles": {
+    "count": 4,
+    "specs": [
+      {
+        "type": "sports",
+        "color": "#118ab2",
+        "wheel_color": "#22223b",
+        "label": "Car 1",
+        "scale": 1.0,
+        "mass_override": null,
+        "spawn_offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "spawn_yaw_deg": 0.0,
+        "style": "balanced"
+      },
+      {
+        "type": "compact",
+        "color": "#1d71f2",
+        "wheel_color": "#22223b",
+        "label": "Car 2",
+        "scale": 1.0,
+        "mass_override": null,
+        "spawn_offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "spawn_yaw_deg": 0.0,
+        "style": "aggressive"
+      },
+      {
+        "type": "truck",
+        "color": "#fb5607",
+        "wheel_color": "#22223b",
+        "label": "Car 3",
+        "scale": 1.0,
+        "mass_override": null,
+        "spawn_offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "spawn_yaw_deg": 0.0,
+        "style": "cautious"
+      },
+      {
+        "type": "monster",
+        "color": "#ffd166",
+        "wheel_color": "#22223b",
+        "label": "Car 4",
+        "scale": 1.0,
+        "mass_override": null,
+        "spawn_offset": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "spawn_yaw_deg": 0.0,
+        "style": "balanced"
+      }
+    ]
+  },
+  "output": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "quality": "medium",
+    "out_dir": null,
+    "out_file": "colorrush_render.mp4",
+    "music_path": null,
+    "music_volume": 0.35,
+    "sfx_enabled": true
+  },
+  "layout": {
+    "meta": {
+      "segment_count": 4,
+      "arena": {
+        "size": [
+          290.7016400539395,
+          104.0
+        ]
+      },
+      "sky": {
+        "energy": 1.5,
+        "top_color": "#8ecae6",
+        "ground_color": "#f1faee"
+      },
+      "sun": {
+        "rotation_deg": [
+          -38.0,
+          -25.0
+        ],
+        "energy": 1.2
+      },
+      "duration_hint": 24
+    },
+    "road": [
+      {
+        "kind": "platform",
+        "from": [
+          28.0,
+          0.25,
+          0.0
+        ],
+        "size": [
+          56.0,
+          0.5,
+          26.0
+        ],
+        "color": "#495057"
+      },
+      {
+        "kind": "ramp",
+        "from": [
+          78.35082002696976,
+          5.583538350012225,
+          0.0
+        ],
+        "size": [
+          46.0,
+          1.0,
+          26.0
+        ],
+        "color": "#3a86ff",
+        "rot_deg": [
+          0.0,
+          0.0,
+          13.64530039930056
+        ]
+      },
+      {
+        "kind": "platform",
+        "from": [
+          148.7016400539395,
+          5.025184515011003,
+          0.0
+        ],
+        "size": [
+          44.0,
+          0.5,
+          26.0
+        ],
+        "color": "#fb5607"
+      },
+      {
+        "kind": "platform",
+        "from": [
+          195.7016400539395,
+          5.025184515011003,
+          0.0
+        ],
+        "size": [
+          50.0,
+          0.5,
+          26.0
+        ],
+        "color": "#495057"
+      }
+    ],
+    "obstacles": [
+      {
+        "type": "barrier",
+        "at": [
+          212.7016400539395,
+          6.025184515011003,
+          0
+        ],
+        "size": [
+          1.2,
+          2.4,
+          18.2
+        ],
+        "rot_deg": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "type": "hammer",
+        "at": [
+          12.0,
+          9.0,
+          -11.0
+        ],
+        "arm_len": 8.0,
+        "head_size": 3.0,
+        "swing_sec": 2.467522164654708,
+        "phase_deg": 109.05943522192831
+      },
+      {
+        "type": "hammer",
+        "at": [
+          26.0,
+          9.0,
+          -11.0
+        ],
+        "arm_len": 8.0,
+        "head_size": 3.0,
+        "swing_sec": 3.296419405376701,
+        "phase_deg": 118.58461977010502
+      }
+    ],
+    "zones": [
+      {
+        "type": "launch",
+        "at": [
+          100.7016400539395,
+          11.16707670002445,
+          0.0
+        ],
+        "size": [
+          6.0,
+          3.0,
+          26.0
+        ]
+      },
+      {
+        "type": "landing",
+        "at": [
+          138.7016400539395,
+          5.025184515011003,
+          0.0
+        ],
+        "size": [
+          16.0,
+          3.0,
+          26.0
+        ]
+      },
+      {
+        "type": "finish",
+        "at": [
+          212.7016400539395,
+          5.025184515011003,
+          0.0
+        ],
+        "size": [
+          8.0,
+          4.0,
+          26.0
+        ]
+      }
+    ],
+    "spawns": [
+      [
+        6.0,
+        0.05,
+        -7.767229182941859
+      ],
+      [
+        6.0,
+        0.05,
+        -3.359328227623762
+      ],
+      [
+        6.0,
+        0.05,
+        3.4244153061621674
+      ],
+      [
+        6.0,
+        0.05,
+        7.338214123226205
+      ]
+    ],
+    "camera_hints": {
+      "start": [
+        0.0,
+        8.0,
+        -30.0
+      ],
+      "ramp_top": [
+        100.7016400539395,
+        13.66707670002445,
+        -20.0
+      ],
+      "gap_mid": [
+        113.7016400539395,
+        20.167076700024452,
+        0.0
+      ],
+      "landing": [
+        132.7016400539395,
+        12.025184515011002,
+        -22.0
+      ],
+      "finish": [
+        200.7016400539395,
+        14.025184515011002,
+        -26.0
+      ]
+    }
+  }
+}
