@@ -15,6 +15,7 @@ DEFAULTS: Dict[str, Any] = {
     "resolution": "1080p",
     "fps": 30,
     "quality": "medium",
+    "camera_style": "cinematic_auto",
     "duration": None,          # None = template default
     "vehicle_count": None,     # None = template default
     "vehicle_type": None,      # None = template default

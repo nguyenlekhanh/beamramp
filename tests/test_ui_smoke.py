@@ -1,4 +1,5 @@
 """UI smoke tests: startup, template switching, shutdown (offscreen platform)."""
+import json
 import os
 import sys
 from pathlib import Path
@@ -84,4 +85,58 @@ def test_open_last_mp4_disabled_initially(qapp, isolated_settings):
     w = MainWindow()
     assert not w.btn_open_mp4.isEnabled()
     assert not w.btn_cancel.isEnabled()
+    w.close()
+
+
+def test_presets_loaded_and_applied(qapp, isolated_settings):
+    from app.ui.main_window import MainWindow
+    w = MainWindow()
+    assert w.combo_preset.count() >= 3
+    # applying the square preset flips the aspect radio
+    for i in range(w.combo_preset.count()):
+        name = w.combo_preset.itemText(i)
+        if "Square" in name:
+            w.combo_preset.setCurrentIndex(i)
+            break
+    w._apply_preset()
+    assert w.radio_11.isChecked()
+    assert w._resolve_aspect() == "1:1"
+    w.close()
+
+
+def test_batch_panel_creates_manifest(qapp, isolated_settings, monkeypatch, tmp_path):
+    from app.ui.main_window import MainWindow
+    from app.render_queue import jobs as batch_jobs
+    monkeypatch.setattr(batch_jobs, "BATCHES_DIR", tmp_path)
+    w = MainWindow()
+    w.spin_variations.setValue(3)
+    w._on_add_batch()
+    assert w.lst_batch.count() >= 1
+    man = w.active_manifest
+    assert man is not None and len(man.jobs) == 3
+    assert all(j.status == "pending" for j in man.jobs)
+    assert "batch_id" in man.to_dict()
+    # cancel pending without starting anything
+    w._on_cancel_pending_jobs()
+    assert all(j.status == "cancelled" for j in man.jobs)
+    doc = json.loads(man.path.read_text(encoding="utf-8"))
+    assert {j["status"] for j in doc["jobs"]} == {"cancelled"}
+    w.close()
+
+
+def test_batch_start_disabled_when_busy_and_no_pending(qapp, isolated_settings):
+    from app.ui.main_window import MainWindow
+    w = MainWindow()
+    assert not w.btn_batch_start.isEnabled()
+    assert w.btn_batch_add.isEnabled()
+    w.close()
+
+
+def test_collect_config_includes_camera_style(qapp, isolated_settings):
+    from app.ui.main_window import MainWindow
+    w = MainWindow()
+    cfg = w._collect_config()
+    assert cfg["camera_style"] == "cinematic_auto"
+    w.combo_camera.setCurrentIndex(1)
+    assert w._collect_config()["camera_style"] == "single_wide"
     w.close()

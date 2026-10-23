@@ -75,6 +75,10 @@ def validate_config(cfg: Dict[str, Any]) -> None:
     if fps not in SUPPORTED_FPS:
         raise ConfigError(f"fps must be one of {SUPPORTED_FPS} (got {fps})")
 
+    camera_style = str(cfg.get("camera_style") or "cinematic_auto")
+    if camera_style not in ("cinematic_auto", "single_wide"):
+        raise ConfigError(f"unknown camera style: {camera_style!r}")
+
     if cfg.get("quality") not in SUPPORTED_QUALITIES:
         raise ConfigError(f"quality must be one of {SUPPORTED_QUALITIES} (got {cfg.get('quality')!r})")
 
@@ -131,11 +135,12 @@ def build_scenario_from_config(cfg: Dict[str, Any]) -> ScenarioModel:
     quality = str(cfg.get("quality") or "medium")
     vtype = cfg.get("vehicle_type") or None
     color = cfg.get("color") or None
+    camera_style = str(cfg.get("camera_style") or "cinematic_auto")
 
     sc = build_scenario(
         tpl["id"], seed,
         vehicle_count=count, duration=duration,
-        camera_style="cinematic_auto",
+        camera_style=camera_style,
         vehicle_type=vtype,
         output_overrides={
             "width": w, "height": h, "fps": fps, "quality": quality,

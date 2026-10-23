@@ -1,0 +1,26 @@
+{
+  "schema": "crs.presets/1",
+  "presets": [
+    {
+      "name": "YouTube Shorts 9:16",
+      "aspect": "9:16",
+      "resolution": "1080p",
+      "fps": 30,
+      "quality": "medium"
+    },
+    {
+      "name": "YouTube Landscape 16:9",
+      "aspect": "16:9",
+      "resolution": "1080p",
+      "fps": 30,
+      "quality": "medium"
+    },
+    {
+      "name": "Square 1:1",
+      "aspect": "1:1",
+      "resolution": "1080p",
+      "fps": 30,
+      "quality": "medium"
+    }
+  ]
+}
