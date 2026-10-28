@@ -6,24 +6,26 @@ import os
 from pathlib import Path
 from typing import List, Optional
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QPalette
+from PySide6.QtCore import QSize, Qt
+from PySide6.QtGui import QColor, QIcon, QImage, QPalette
 from PySide6.QtWidgets import (
     QCheckBox, QColorDialog, QComboBox, QFileDialog, QFormLayout, QFrame,
-    QGroupBox, QHBoxLayout, QInputDialog, QLabel, QListWidget, QListWidgetItem,
-    QMainWindow, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton,
-    QRadioButton, QSpinBox, QVBoxLayout, QWidget, QButtonGroup,
+    QGroupBox, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
+    QListWidgetItem, QMainWindow, QMessageBox, QPlainTextEdit, QProgressBar,
+    QPushButton, QRadioButton, QSpinBox, QVBoxLayout, QWidget, QButtonGroup,
 )
 
 from ..models.scenario import CAMERA_STYLES
-from ..services import render_service, preset_service
+from ..services import (asset_service, ffmpeg_service, montage_service,
+                        package_service, preset_service, render_service,
+                        thumbnail_service)
 from ..services.ffmpeg_service import get_tools
 from ..render_queue import jobs as batch_jobs
 from ..render_queue.runner import BatchRunner
 from ..render_queue.variation import (expand_variations, DEFAULT_SEED_STEP,
                                       MAX_BATCH_JOBS)
 from . import settings_store
-from .render_worker import RenderWorker
+from .render_worker import RenderWorker, ServiceWorker
 
 ASPECTS = [
     ("9:16", "Shorts 9:16"),
@@ -40,10 +42,17 @@ class MainWindow(QMainWindow):
         self.resize(1180, 820)
         self.worker: Optional[RenderWorker] = None
         self.batch_runner: Optional[BatchRunner] = None
+        self.post_worker: Optional[ServiceWorker] = None
+        self.asset_worker: Optional[ServiceWorker] = None
+        self.current_asset: Optional[str] = None
         self.manifests: List = []
         self.active_manifest = None
         self.presets: List = []
         self.last_result: Optional[dict] = None
+        self.post_specs: List = []
+        self.montage_result: Optional[dict] = None
+        self.thumb_manifest: Optional[dict] = None
+        self.last_package: Optional[dict] = None
         self.primary_color: Optional[str] = settings_store.load_settings().get("color")
         self.music_path: Optional[str] = settings_store.load_settings().get("music_path")
         self._preview_w, self._preview_h = 720, 1280
@@ -187,10 +196,14 @@ class MainWindow(QMainWindow):
         out_form.addRow("File name (auto)", self.lbl_file_hint)
         right.addWidget(out_group, 1)
 
+        right.addWidget(self._build_assets_group(), 1)
+
         right.addWidget(self._build_preset_group())
 
         batch_group = self._build_batch_group()
         right.addWidget(batch_group, 2)
+
+        right.addWidget(self._build_post_group(), 2)
 
         # ---- progress area
         prog_group = QGroupBox("Preview & Render")
@@ -248,6 +261,126 @@ class MainWindow(QMainWindow):
         self.lbl_file_hint = QLabel()
         self.lbl_file_hint.setWordWrap(False)
         return row
+
+    # ------------------------------------------------ asset import (M3.6A)
+    def _build_assets_group(self) -> QGroupBox:
+        group = QGroupBox("Assets (GLB preview)")
+        v = QVBoxLayout(group)
+        self.lbl_asset = QLabel("(no asset loaded)")
+        self.lbl_asset.setWordWrap(True)
+        self.btn_asset_import = QPushButton("Import GLB...")
+        self.btn_asset_report = QPushButton("Asset Report")
+        self.btn_asset_report.setEnabled(self.current_asset is not None)
+        self.btn_asset_open = QPushButton("Preview Window")
+        self.btn_asset_open.setEnabled(self.current_asset is not None)
+        v.addWidget(self.lbl_asset)
+        row = QHBoxLayout()
+        row.addWidget(self.btn_asset_import)
+        row.addWidget(self.btn_asset_report)
+        v.addLayout(row)
+        v.addWidget(self.btn_asset_open)
+        self.btn_asset_import.clicked.connect(self._on_import_asset)
+        self.btn_asset_report.clicked.connect(self._on_asset_report)
+        self.btn_asset_open.clicked.connect(self._on_asset_preview)
+        return group
+
+    def _refresh_asset_buttons(self) -> None:
+        busy = self.asset_worker is not None
+        has_asset = self.current_asset is not None
+        self.btn_asset_import.setEnabled(not busy)
+        self.btn_asset_report.setEnabled(not busy and has_asset)
+        self.btn_asset_open.setEnabled(not busy and has_asset)
+
+    def _start_asset_worker(self, fn, args=(), kwargs=None,
+                            done_slot=None, fail_slot=None) -> None:
+        if self.asset_worker is not None:
+            return
+        worker = ServiceWorker(fn, args=args, kwargs=kwargs)
+        self.asset_worker = worker
+        worker.signals.log.connect(self._append_log)
+        worker.signals.result.connect(done_slot)
+        worker.signals.failure.connect(fail_slot)
+        worker.signals.job_finished.connect(
+            lambda: (worker.wait(), self._asset_finished()))
+        self._refresh_asset_buttons()
+        worker.start()
+
+    def _asset_finished(self) -> None:
+        self.asset_worker = None
+        self._refresh_asset_buttons()
+
+    def _on_import_asset(self) -> None:
+        if self.asset_worker is not None:
+            return
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Choose a GLB model",
+            str(asset_service.USER_ASSETS_DIR if
+                asset_service.USER_ASSETS_DIR.exists() else ""),
+            "GLB models (*.glb);;All files (*.*)")
+        if not path:
+            return
+        self._start_asset_worker(
+            asset_service.prepare_asset, (path,),
+            kwargs={"log_cb": self._append_log},
+            done_slot=self._on_asset_imported,
+            fail_slot=self._on_asset_failed)
+
+    def _on_asset_imported(self, res: dict) -> None:
+        self.current_asset = res["copied"]
+        self.lbl_asset.setText(Path(res["copied"]).name)
+        self.lbl_asset.setToolTip(res["copied"])
+        self._refresh_asset_buttons()
+        self._on_status("asset imported: " + Path(res["copied"]).name)
+        self._append_log("[asset] source kept untouched: " + res["source"])
+
+    def _on_asset_report(self) -> None:
+        if self.asset_worker is not None or not self.current_asset:
+            return
+        self._start_asset_worker(
+            asset_service.generate_report, (self.current_asset,),
+            kwargs={"log_cb": self._append_log},
+            done_slot=self._on_asset_report_done,
+            fail_slot=self._on_asset_failed)
+
+    def _on_asset_report_done(self, doc: dict) -> None:
+        verdict = doc.get("verdict")
+        path = doc.get("python_report_path", "")
+        self._on_status(f"asset report: {verdict} ({doc.get('python_report_path', '')})")
+        self._append_log("[asset] report verdict: " + str(verdict))
+        for w in doc.get("warnings") or []:
+            self._append_log("[asset] warning: " + str(w))
+        self._append_log("[asset] report saved: " + path)
+        if verdict == "load_failed":
+            QMessageBox.warning(
+                self, "Asset report",
+                "The asset FAILED to load:\n" + str(doc.get("error", ""))
+                + "\n\nSee docs/asset_import.md for troubleshooting.")
+        else:
+            QMessageBox.information(
+                self, "Asset report",
+                f"Verdict: {verdict}\n{len(doc.get('warnings') or [])} warning(s)\n"
+                "Loading proves visual instantiation only - it does NOT verify "
+                "production readiness, wheel placement, or physics/collisions.\n\n"
+                + path)
+
+    def _on_asset_preview(self) -> None:
+        if self.asset_worker is not None or not self.current_asset:
+            return
+        self._start_asset_worker(
+            asset_service.open_preview, (self.current_asset,),
+            kwargs={"scale": 1.0, "pitch_deg": 0.0, "yaw_deg": 0.0,
+                    "log_cb": self._append_log},
+            done_slot=self._on_asset_preview_done,
+            fail_slot=self._on_asset_failed)
+
+    def _on_asset_preview_done(self, res: dict) -> None:
+        self._on_status("preview window opened "
+                        f"({Path(res['copied_asset_path']).name}) - close it manually")
+
+    def _on_asset_failed(self, message: str) -> None:
+        QMessageBox.critical(self, "Asset action failed", message)
+        self._append_log("[asset] error: " + message)
+        self._on_status("asset action failed - see log.")
 
     # ------------------------------------------------ render presets
     def _build_preset_group(self) -> QGroupBox:
@@ -432,6 +565,444 @@ class MainWindow(QMainWindow):
         self.btn_open_manifest.clicked.connect(self._open_manifest)
         self.lst_batch.currentRowChanged.connect(self._on_batch_selected)
         return group
+
+    # ------------------------------------------------ post production
+    MONTAGES_DIR = Path(__file__).resolve().parents[2] / "output" / "montages"
+
+    def _build_post_group(self) -> QGroupBox:
+        group = QGroupBox("Post Production (Montage / Thumbnail / Package)")
+        v = QVBoxLayout(group)
+
+        src_row = QHBoxLayout()
+        self.combo_post_batch = QComboBox()
+        src_row.addWidget(QLabel("Batch"))
+        src_row.addWidget(self.combo_post_batch, 3)
+        self.btn_post_load = QPushButton("Load Completed Clips")
+        src_row.addWidget(self.btn_post_load)
+        v.addLayout(src_row)
+
+        self.lst_clips = QListWidget()
+        self.lst_clips.setMinimumHeight(80)
+        v.addWidget(self.lst_clips, 3)
+
+        arr_row = QHBoxLayout()
+        self.btn_clip_up = QPushButton("Up")
+        self.btn_clip_down = QPushButton("Down")
+        self.btn_clip_remove = QPushButton("Remove")
+        for b, slot in ((self.btn_clip_up, self._on_clip_up),
+                        (self.btn_clip_down, self._on_clip_down),
+                        (self.btn_clip_remove, self._on_clip_remove)):
+            arr_row.addWidget(b)
+            b.clicked.connect(slot)
+        arr_row.addStretch(1)
+        v.addLayout(arr_row)
+
+        form = QFormLayout()
+        self.combo_m_aspect = QComboBox()
+        for key, label in ASPECTS:
+            self.combo_m_aspect.addItem(label, key)
+        self.combo_m_aspect.addItem("Portrait 4:5", "4:5")
+        form.addRow("Aspect", self.combo_m_aspect)
+        self.combo_m_res = QComboBox()
+        for key, label in RESOLUTIONS:
+            self.combo_m_res.addItem(label, key)
+        form.addRow("Resolution", self.combo_m_res)
+        self.combo_m_fps = QComboBox()
+        for fps in (24, 30, 60):
+            self.combo_m_fps.addItem(f"{fps} FPS", fps)
+        form.addRow("FPS", self.combo_m_fps)
+        self.combo_m_trans = QComboBox()
+        self.combo_m_trans.addItem("Hard cut", "cut")
+        self.combo_m_trans.addItem("Cross fade", "fade")
+        self.combo_m_trans.currentIndexChanged.connect(self._update_fade_enable)
+        form.addRow("Transition", self.combo_m_trans)
+        self.spin_m_fade = QSpinBox()
+        self.spin_m_fade.setRange(20, 200)     # tenths of a second
+        self.spin_m_fade.setValue(50)
+        self.spin_m_fade.setSuffix(" ms")
+        form.addRow("Fade length", self.spin_m_fade)
+        self.combo_m_fit = QComboBox()
+        self.combo_m_fit.addItem("Pad (letterbox, no distortion)", "pad")
+        self.combo_m_fit.addItem("Crop (center, fills frame)", "crop")
+        form.addRow("Fit policy", self.combo_m_fit)
+        self.combo_m_quality = QComboBox()
+        for q in ("low", "medium", "high"):
+            self.combo_m_quality.addItem(q.capitalize(), q)
+        form.addRow("Quality", self.combo_m_quality)
+        v.addLayout(form)
+
+        music_row = QHBoxLayout()
+        self.m_lbl_m_music = QLabel("(none)")
+        self.btn_m_music = QPushButton("Music (optional)...")
+        music_row.addWidget(self.m_lbl_m_music, 1)
+        music_row.addWidget(self.btn_m_music)
+        v.addLayout(music_row)
+        vol_row = QHBoxLayout()
+        vol_row.addWidget(QLabel("Music volume"))
+        self.spin_m_music_vol = QSpinBox()
+        self.spin_m_music_vol.setRange(0, 100)
+        self.spin_m_music_vol.setValue(35)
+        self.spin_m_music_vol.setSuffix(" %")
+        vol_row.addWidget(self.spin_m_music_vol)
+        vol_row.addStretch(1)
+        v.addLayout(vol_row)
+
+        self.lbl_m_estimate = QLabel("Est. duration: -")
+        self.lbl_m_estimate.setWordWrap(True)
+        v.addWidget(self.lbl_m_estimate)
+
+        self.btn_m_build = QPushButton("Build Montage")
+        self.btn_m_build.clicked.connect(self._on_build_montage)
+        v.addWidget(self.btn_m_build)
+
+        thumb_row = QHBoxLayout()
+        thumb_row.addWidget(QLabel("Thumbnails"))
+        self.spin_thumbs = QSpinBox()
+        self.spin_thumbs.setRange(1, 12)
+        self.spin_thumbs.setValue(6)
+        thumb_row.addWidget(self.spin_thumbs)
+        self.btn_thumbs_gen = QPushButton("Generate Candidates")
+        self.btn_thumbs_gen.clicked.connect(self._on_gen_thumbs)
+        thumb_row.addWidget(self.btn_thumbs_gen)
+        thumb_row.addStretch(1)
+        v.addLayout(thumb_row)
+        self.lst_thumbs = QListWidget()
+        self.lst_thumbs.setMinimumHeight(84)
+        self.lst_thumbs.setIconSize(QSize(96, 54))
+        self.lst_thumbs.setViewMode(QListWidget.IconMode)
+        v.addWidget(self.lst_thumbs, 2)
+        self.btn_thumb_save = QPushButton("Save Selected Thumbnail")
+        self.btn_thumb_save.clicked.connect(self._on_save_thumb)
+        self.btn_thumb_save.setEnabled(False)
+        v.addWidget(self.btn_thumb_save)
+
+        self.ed_p_title = QLineEdit()
+        v.addWidget(self.ed_p_title)
+        self.ed_p_desc = QPlainTextEdit()
+        self.ed_p_desc.setPlaceholderText("Video description (your words...")
+        self.ed_p_desc.setMaximumHeight(58)
+        v.addWidget(self.ed_p_desc)
+        self.ed_p_tags = QLineEdit()
+        self.ed_p_tags.setPlaceholderText("tags, comma separated")
+        v.addWidget(self.ed_p_tags)
+        pkg_row = QHBoxLayout()
+        self.btn_pkg_export = QPushButton("Export Package")
+        self.btn_pkg_open = QPushButton("Open Package Folder")
+        self.btn_pkg_open.setEnabled(False)
+        for b, slot in ((self.btn_pkg_export, self._on_export_package),
+                        (self.btn_pkg_open, self._on_open_package)):
+            pkg_row.addWidget(b)
+            b.clicked.connect(slot)
+        pkg_row.addStretch(1)
+        v.addLayout(pkg_row)
+
+        self.btn_post_load.clicked.connect(self._on_post_load_clips)
+        self.btn_m_music.clicked.connect(self._on_pick_m_music)
+        for w in (self.combo_m_aspect, self.combo_m_res, self.combo_m_fps,
+                  self.combo_m_fit, self.combo_m_quality,
+                  self.combo_m_trans):
+            w.currentIndexChanged.connect(self._update_m_estimate)
+        self.spin_m_fade.valueChanged.connect(self._update_m_estimate)
+        self.spin_m_music_vol.valueChanged.connect(self._update_m_estimate)
+        self.lst_clips.itemChanged.connect(self._update_m_estimate)
+        self.lst_thumbs.currentRowChanged.connect(self._on_thumb_selected)
+        self.ed_p_title.textChanged.connect(self._refresh_post_buttons)
+        self._update_fade_enable()
+        self._update_m_estimate()
+        return group
+
+    def _on_pick_m_music(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Choose music file", "",
+            "Audio files (*.wav *.mp3 *.m4a *.flac *.ogg);;All files (*.*)")
+        if path:
+            self.m_lbl_m_music.setText(Path(path).name)
+            self.m_lbl_m_music.setToolTip(path)
+
+    def _m_music_path(self) -> Optional[str]:
+        tip = self.m_lbl_m_music.toolTip()
+        return tip if tip and Path(tip).exists() else None
+
+    def _m_config(self) -> "montage_service.MontageConfig":
+        music = self._m_music_path()
+        return montage_service.MontageConfig(
+            aspect=self.combo_m_aspect.currentData(),
+            resolution=self.combo_m_res.currentData(),
+            fps=int(self.combo_m_fps.currentData() or 30),
+            quality=self.combo_m_quality.currentData(),
+            transition=self.combo_m_trans.currentData(),
+            fade_duration=self.spin_m_fade.value() / 100.0,
+            fit_policy=self.combo_m_fit.currentData(),
+            music_path=music,
+            music_volume=self.spin_m_music_vol.value() / 100.0)
+
+    def _checked_specs(self) -> List:
+        out = []
+        for row in range(self.lst_clips.count()):
+            item = self.lst_clips.item(row)
+            if item.checkState() == Qt.Checked:
+                out.append(self.post_specs[int(item.data(Qt.UserRole))])
+        return out
+
+    def _refresh_post_buttons(self) -> None:
+        busy = self.worker is not None or self.batch_runner is not None \
+            or self.post_worker is not None
+        specs_ok = bool(self._checked_specs())
+        self.btn_post_load.setEnabled(not busy)
+        self.btn_m_build.setEnabled(not busy and specs_ok)
+        self.btn_thumbs_gen.setEnabled(
+            not busy and self.montage_result is not None)
+        self.btn_thumb_save.setEnabled(
+            not busy and self.thumb_manifest is not None
+            and self.lst_thumbs.currentRow() >= 0)
+        self.btn_pkg_export.setEnabled(
+            not busy and self.montage_result is not None
+            and bool(self.ed_p_title.text().strip()))
+
+    def _update_fade_enable(self) -> None:
+        self.spin_m_fade.setEnabled(
+            self.combo_m_trans.currentData() == "fade")
+        self._update_m_estimate()
+
+    def _update_m_estimate(self, *_args) -> None:
+        specs = self._checked_specs()
+        try:
+            cfg = self._m_config()
+        except montage_service.MontageError as exc:
+            self.lbl_m_estimate.setText(f"Est. duration error: {exc}")
+            return
+        if not specs:
+            self.lbl_m_estimate.setText("Est. duration: - (0 clips)")
+            return
+        try:
+            mont_est = montage_service.estimate_duration(specs, cfg)
+        except (montage_service.MontageError,
+                montage_service.MontageInputError) as exc:
+            self.lbl_m_estimate.setText(f"Est. duration error: {exc}")
+            return
+        self.lbl_m_estimate.setText(
+            f"Est. duration: {mont_est:.1f} s ({len(specs)} clips, "
+            f"music {'ON' if self._m_music_path() else 'OFF'})")
+
+    def _on_post_load_clips(self) -> None:
+        if self.worker is not None or self.batch_runner is not None \
+                or self.post_worker is not None:
+            return
+        m = self.active_manifest
+        if m is None:
+            idx = self.combo_post_batch.currentIndex()
+            if 0 <= idx < len(self.manifests):
+                m = self.manifests[idx]
+        if m is None:
+            self._note("no batch selected (create one first)")
+            return
+        try:
+            specs = montage_service.clips_from_manifest(m, recheck=False)
+        except montage_service.MontageInputError as exc:
+            self._append_log(f"montage error: {exc}")
+            QMessageBox.warning(self, "No usable clips", str(exc))
+            return
+        if not specs:
+            QMessageBox.warning(self, "No usable clips",
+                                "This batch has no succeeded jobs.")
+            return
+        self.post_specs = specs
+        self.lst_clips.blockSignals(True)
+        self.lst_clips.clear()
+        for i, spec in enumerate(specs):
+            src = spec.source or {}
+            label = (f"{spec.label or src.get('template_name', 'clip')} "
+                     f"(s{src.get('seed', '?')}, {spec.duration:.1f}s"
+                     f"{', no audio' if not spec.has_audio else ''})")
+            item = QListWidgetItem(label)
+            item.setData(Qt.UserRole, i)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Checked)
+            self.lst_clips.addItem(item)
+        self.lst_clips.blockSignals(False)
+        self._note(f"loaded {len(specs)} completed clips from {m.name}")
+        self._update_m_estimate()
+
+    def _move_item(self, delta: int) -> None:
+        row = self.lst_clips.currentRow()
+        target = row + delta
+        if not 0 <= row < self.lst_clips.count() or \
+                not 0 <= target < self.lst_clips.count():
+            return
+        self.lst_clips.blockSignals(True)
+        item = self.lst_clips.takeItem(row)
+        self.lst_clips.insertItem(target, item)
+        self.lst_clips.setCurrentRow(target)
+        self.lst_clips.blockSignals(False)
+        self._update_m_estimate()
+
+    def _on_clip_up(self) -> None:
+        self._move_item(-1)
+
+    def _on_clip_down(self) -> None:
+        self._move_item(+1)
+
+    def _on_clip_remove(self) -> None:
+        row = self.lst_clips.currentRow()
+        if row < 0:
+            return
+        self.lst_clips.takeItem(row)
+        self._update_m_estimate()
+
+    def _start_post_worker(self, fn, args=(), kwargs=None,
+                           done_slot=None, fail_slot=None) -> None:
+        if self.post_worker is not None:
+            return
+        worker = ServiceWorker(fn, args=args, kwargs=kwargs)
+        self.post_worker = worker
+        worker.signals.log.connect(self._append_log)
+        worker.signals.result.connect(done_slot)
+        worker.signals.failure.connect(fail_slot)
+        worker.signals.job_finished.connect(
+            lambda: (worker.wait(), self._post_finished()))
+        self._refresh_post_buttons()
+        worker.start()
+
+    def _post_finished(self) -> None:
+        self.post_worker = None
+        self._refresh_post_buttons()
+        self._update_m_estimate()
+
+    def _on_build_montage(self) -> None:
+        if self.post_worker is not None:
+            return
+        specs = self._checked_specs()
+        if not specs:
+            return
+        try:
+            cfg = self._m_config()
+        except montage_service.MontageError as exc:
+            self._append_log(f"montage error: {exc}")
+            return
+        args = (specs, cfg)
+        self._start_post_worker(
+            montage_service.build_montage, args,
+            kwargs={"out_dir": self.MONTAGES_DIR,
+                    "name": "", "log_cb": self._append_log,
+                    "progress_cb": lambda f: self._on_status(
+                        f"montage {int(f*100)}%")},
+            done_slot=self._on_montage_done,
+            fail_slot=self._on_montage_failed)
+
+    def _on_montage_done(self, res: dict) -> None:
+        self.montage_result = res
+        self.thumb_manifest = None
+        self.lst_thumbs.clear()
+        self.btn_thumb_save.setEnabled(False)
+        self.btn_pkg_open.setEnabled(True)
+        self.btn_pkg_open.setToolTip(str(Path(res["out_path"]).parent))
+        self._on_status(f"montage OK: {Path(res['out_path']).name} "
+                        f"({res['measured_duration']:.1f}s, RMS "
+                        f"{res['audio_rms_db']} dB)")
+        self._note("montage built: " + res["out_path"])
+
+    def _on_montage_failed(self, message: str) -> None:
+        QMessageBox.critical(self, "Montage failed", message)
+        self._append_log(f"montage error: {message}")
+        self._on_status("montage failed — see log.")
+
+    def _on_gen_thumbs(self) -> None:
+        if self.post_worker is not None or self.montage_result is None:
+            return
+        out_dir = Path(self.montage_result["out_path"]).parent / "thumbs"
+        self._start_post_worker(
+            thumbnail_service.generate_candidates,
+            (Path(self.montage_result["out_path"]),),
+            kwargs={"count": self.spin_thumbs.value(), "out_dir": out_dir,
+                    "log_cb": self._append_log},
+            done_slot=self._on_thumbs_done,
+            fail_slot=self._on_thumbs_failed)
+
+    def _on_thumbs_done(self, man: dict) -> None:
+        self.thumb_manifest = man
+        self.lst_thumbs.clear()
+        self.btn_thumb_save.setEnabled(True)
+        for cand in man.get("candidates", []):
+            icon = QIcon(str(cand["path"]))
+            item = QListWidgetItem(
+                icon, f"t={cand['timestamp']:.1f}s  bright={cand['brightness']:.0f}"
+                f"  motion={cand['motion']:.2f}  rank={cand['rank']:.1f}")
+            item.setData(Qt.UserRole, cand)
+            self.lst_thumbs.addItem(item)
+        self._note(f"thumbnail candidates: {man.get('manifest_path', '')}")
+
+    def _on_thumbs_failed(self, message: str) -> None:
+        self._append_log(f"thumbnail error: {message}")
+        QMessageBox.critical(self, "Thumbnails failed", message)
+
+    def _on_thumb_selected(self, row: int) -> None:
+        self.btn_thumb_save.setEnabled(
+            self.thumb_manifest is not None and row >= 0)
+
+    def _selected_thumb_path(self) -> Optional[Path]:
+        row = self.lst_thumbs.currentRow()
+        if row < 0 or not self.thumb_manifest:
+            return None
+        cands = self.thumb_manifest.get("candidates") or []
+        if 0 <= row < len(cands):
+            return Path(cands[row]["path"])
+        return None
+
+    def _on_save_thumb(self) -> None:
+        src = self._selected_thumb_path()
+        if src is None or self.montage_result is None:
+            return
+        dest_dir = Path(self.montage_result["out_path"]).parent
+        try:
+            saved = thumbnail_service.save_selected(src, dest_dir)
+        except thumbnail_service.ThumbnailError as exc:
+            QMessageBox.critical(self, "Thumbnail save failed", str(exc))
+            return
+        self._note(f"thumbnail saved: {saved}")
+
+    def _on_export_package(self) -> None:
+        if self.post_worker is not None or self.montage_result is None:
+            return
+        title = self.ed_p_title.text().strip()
+        if not title:
+            QMessageBox.warning(self, "Title required",
+                                "Type a video title before exporting.")
+            return
+        tags = [t.strip() for t in self.ed_p_tags.text().split(",") if t.strip()]
+        mtree_args = dict(
+            video=Path(self.montage_result["out_path"]),
+            title=title,
+            description=self.ed_p_desc.toPlainText().strip(),
+            tags=tags,
+            montage_manifest=Path(self.montage_result["manifest_path"]),
+            source_jobs=[
+                {"job_id": c.get("source", {}).get("job_id", ""),
+                 "seed": c.get("source", {}).get("seed"),
+                 "template": c.get("source", {}).get("template_id", "")}
+                for c in self.montage_result.get("inputs", [])],
+            settings=dict(self.montage_result.get("config") or {}),
+            log_cb=self._append_log)
+        self._start_post_worker(
+            package_service.create_package, tuple(),
+            kwargs=mtree_args,
+            done_slot=self._on_package_done,
+            fail_slot=self._on_package_failed)
+
+    def _on_package_done(self, doc: dict) -> None:
+        self.last_package = doc
+        self.btn_pkg_open.setEnabled(True)
+        self.btn_pkg_open.setToolTip(doc["package_dir"])
+        self._note(f"package exported: {doc['package_dir']}")
+        self._on_status("package ready (nothing is uploaded).")
+
+    def _on_package_failed(self, message: str) -> None:
+        self._append_log(f"package error: {message}")
+        QMessageBox.critical(self, "Package failed", message)
+
+    def _on_open_package(self) -> None:
+        tip = self.btn_pkg_open.toolTip()
+        if tip and Path(tip).exists():
+            os.startfile(tip)  # noqa: S606 - by design in a GUI shell
 
     # ------------------------------------------------ helpers
     def _reload_settings(self) -> None:
@@ -643,6 +1214,7 @@ class MainWindow(QMainWindow):
         self.btn_render.setEnabled(not busy)
         self.btn_preview.setEnabled(not busy)
         self.btn_cancel.setEnabled(busy)
+        self._refresh_post_buttons()
 
     def _on_render(self) -> None:
         if self.worker is not None:
@@ -716,6 +1288,12 @@ class MainWindow(QMainWindow):
             self.lst_batch.addItem(f"{m.name} — {done}/{total} [{counts}]")
         self.lst_batch.blockSignals(False)
         self._refresh_batch_buttons()
+        # keep the post-production source picker in sync
+        self.combo_post_batch.blockSignals(True)
+        self.combo_post_batch.clear()
+        for m in self.manifests:
+            self.combo_post_batch.addItem(m.name, m.batch_id)
+        self.combo_post_batch.blockSignals(False)
 
     def _on_batch_selected(self, row: int) -> None:
         self.active_manifest = self.manifests[row] if 0 <= row < len(self.manifests) else None
@@ -734,6 +1312,7 @@ class MainWindow(QMainWindow):
         self.btn_batch_retry.setEnabled(bool(m) and failedish > 0 and not running)
         self.btn_render.setEnabled(not running)
         self.btn_preview.setEnabled(not running)
+        self._refresh_post_buttons()
 
     def _on_add_batch(self) -> None:
         if self.batch_runner is not None or self.worker is not None:

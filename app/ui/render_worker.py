@@ -86,3 +86,27 @@ class RenderWorker(QThread):
                 self.signals.failure.emit(f"{type(exc).__name__}: {exc}")
         finally:
             self.signals.job_finished.emit()
+
+
+class ServiceWorker(QThread):
+    """Runs exactly one service callable off the UI thread.
+
+    Kept deliberately dumb: the caller supplies fn/args/kwargs (including
+    thread-safe ``log_cb``/``progress_cb`` hooks that emit Qt signals).
+    """
+
+    def __init__(self, fn, args=(), kwargs=None, parent=None):
+        super().__init__(parent)
+        self.signals = JobSignals()
+        self.fn = fn
+        self.args = tuple(args)
+        self.kwargs = dict(kwargs or {})
+
+    def run(self) -> None:
+        try:
+            res = self.fn(*self.args, **self.kwargs)
+            self.signals.result.emit(res)
+        except Exception as exc:  # noqa: BLE001 - surfaced in the UI
+            self.signals.failure.emit(f"{type(exc).__name__}: {exc}")
+        finally:
+            self.signals.job_finished.emit()

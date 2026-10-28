@@ -140,3 +140,80 @@ def test_collect_config_includes_camera_style(qapp, isolated_settings):
     w.combo_camera.setCurrentIndex(1)
     assert w._collect_config()["camera_style"] == "single_wide"
     w.close()
+
+
+# ---------------------------------------------------- post production (M3.4)
+
+def _render_service_ff_tools():  # ffmpeg guard helper
+    from app.services.ffmpeg_service import get_tools
+    t = get_tools()
+    return bool(t.get("ffmpeg") and t.get("ffprobe"))
+
+
+def _req_ff():  # plain runtime guard inside tests
+    if not _render_service_ff_tools():
+        pytest.skip("ffmpeg required")
+
+
+def _make_test_clip(path, dur=1.2):
+    import subprocess
+    from app.services.ffmpeg_service import get_tools
+    ffmpeg = get_tools()["ffmpeg"]
+    proc = subprocess.run(
+        [ffmpeg, "-y", "-hide_banner", "-nostdin",
+         "-f", "lavfi", "-i",
+         f"color=red:size=320x180:rate=30:duration={dur}",
+         "-f", "lavfi", "-i", f"sine=frequency=330:duration={dur}",
+         "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+         "-c:a", "aac", str(path)], capture_output=True, text=True, timeout=180)
+    assert proc.returncode == 0, proc.stderr[-300:]
+
+
+def test_post_panel_constructs(qapp, isolated_settings):
+    from app.ui.main_window import MainWindow
+    w = MainWindow()
+    assert w.btn_m_build.isEnabled() is False
+    assert "0 clips" in w.lbl_m_estimate.text()
+    assert w.btn_thumbs_gen.isEnabled() is False
+    assert not w.btn_pkg_export.isEnabled()
+    # transition toggles the fade spinbox
+    w.combo_m_trans.setCurrentIndex(1)
+    assert w.spin_m_fade.isEnabled()
+    w.combo_m_trans.setCurrentIndex(0)
+    assert not w.spin_m_fade.isEnabled()
+    w.close()
+
+
+def test_post_load_clips_updates_estimate(qapp, isolated_settings,
+                                          monkeypatch, tmp_path):
+    _req_ff()
+    from app.ui.main_window import MainWindow
+    from app.render_queue import jobs as batch_jobs
+    clip = tmp_path / "jobclip.mp4"
+    _make_test_clip(clip)
+    job = batch_jobs.JobRecord(
+        job_id="j1", batch_id="b_ui", name="clip_one",
+        template_id="gap_jump", template_name="Gap Jump", seed=42,
+        config={"resolution": "720p", "aspect": "16:9"},
+        preset="", status="succeeded", output_path=str(clip),
+        verify={"ok": True, "width": 320, "height": 180, "fps": 30.0})
+    man = batch_jobs.BatchManifest("b_ui", "ui test batch",
+                                   path=tmp_path / "manifest.json",
+                                   jobs=[job])
+    monkeypatch.setattr(batch_jobs, "load_all_manifests",
+                        lambda directory=None: [man])
+    w = MainWindow()
+    assert w.combo_post_batch.count() == 1
+    w._on_post_load_clips()
+    assert w.lst_clips.count() == 1
+    assert "1 clips" in w.lbl_m_estimate.text()
+    # unchecking the clip empties the estimate
+    item = w.lst_clips.item(0)
+    item.setCheckState(item.checkState().__class__.Unchecked)
+    assert "0 clips" in w.lbl_m_estimate.text()
+    item.setCheckState(item.checkState().__class__.Checked)
+    # remove button works
+    w.lst_clips.setCurrentRow(0)
+    w._on_clip_remove()
+    assert w.lst_clips.count() == 0
+    w.close()

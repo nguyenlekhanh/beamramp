@@ -52,6 +52,9 @@
     "out_file": "smoke_test.mp4",
     "music_path": null,
     "music_volume": 0.35,
+    "music_enabled": true,
+    "engine_volume": 0.5,
+    "sfx_volume": 0.8,
     "sfx_enabled": true
   },
   "layout": {

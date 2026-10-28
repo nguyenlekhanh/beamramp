@@ -8,6 +8,7 @@ the output. tools/run_all.py keeps its own independent batch workflow.
 from __future__ import annotations
 
 import datetime
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -16,6 +17,7 @@ from typing import Any, Callable, Dict, Optional
 from ..models.scenario import ScenarioModel
 from . import ffmpeg_service
 from . import godot_service
+from . import quality_service
 from .scenario_service import TEMPLATES, build_scenario
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -240,6 +242,28 @@ def run_single_render(cfg: Dict[str, Any], *,
     if err:
         raise RuntimeError(f"output verification failed: {err}")
     log_cb("[job] VERIFY OK")
+    # durable telemetry copy: the sim workdir is a temp dir that may vanish
+    events_file = quality_path = None
+    if info.get("events_path"):
+        try:
+            events_file = quality_service.persist_events(
+                info["events_path"], mp4)
+        except Exception as exc:  # noqa: BLE001 - persistence must not fail render
+            log_cb(f"[quality] events persistence failed: {exc}")
+    try:
+        report, qpath = quality_service.score_and_write(
+            mp4, events_file=events_file,
+            template_id=str(cfg.get("template_id") or ""),
+            expected={"width": sc.output.width, "height": sc.output.height,
+                      "fps": fps, "want_audio": bool(info.get("has_audio"))},
+            primary_color=quality_service._hex_to_rgb(
+                _primary_color(save_scenario_file)))
+        quality_path = str(qpath)
+        log_cb(f"[quality] {qpath.name}: {report['overall']} "
+               f"({len(report['hard_failures'])} hard / "
+               f"{len(report['soft_warnings'])} soft warnings)")
+    except Exception as exc:  # noqa: BLE001 - report must not fail render
+        log_cb(f"[quality] report skipped: {type(exc).__name__}: {exc}")
     return {
         "mp4_path": str(mp4),
         "scenario_path": str(save_scenario_file),
@@ -249,6 +273,22 @@ def run_single_render(cfg: Dict[str, Any], *,
         "fps": fps,
         "has_audio": info["has_audio"],
         "events_path": info.get("events_path"),
+        "events_file": events_file,
+        "quality_path": quality_path,
         "audio_bed": info.get("audio_bed"),
         "elapsed": info.get("elapsed"),
     }
+
+
+def _primary_color(scenario_path: Path):
+    """Hex color of the primary vehicle for the visual-presence heuristic."""
+    try:
+        doc = json.loads(Path(scenario_path).read_text(encoding="utf-8"))
+        vehicles = doc.get("vehicles") or {}
+        specs = vehicles.get("specs") if isinstance(vehicles, dict) \
+            else vehicles
+        if specs:
+            return specs[0].get("color")
+    except (OSError, ValueError, AttributeError, KeyError, TypeError):
+        pass
+    return None

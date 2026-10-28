@@ -8,8 +8,11 @@ running render; pending jobs can be cancelled separately from the UI thread.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import QObject, QThread, Signal
 
+from ..services import quality_service
 from ..services import render_service
 from . import jobs as jobmod
 import threading
@@ -96,7 +99,12 @@ class BatchRunner(QThread):
                 "fps": res.get("fps"), "duration": round(float(res.get("duration") or 0), 2),
                 "has_audio": bool(res.get("has_audio")),
             }
+            events_file = res.get("events_file")
+            count = quality_service.count_events(events_file)
+            if count is not None:
+                verify["events_count"] = count   # additive, old manifests stay loadable
             job.output_path = res.get("mp4_path")
+            self._score_job(job, res, log_cb)
             jobmod.transition(job, "succeeded", render_log=log_lines, verify=verify)
         except Exception as exc:  # noqa: BLE001 - surfaced per job
             message = f"{type(exc).__name__}: {exc}"
@@ -110,3 +118,33 @@ class BatchRunner(QThread):
         self.manifest.save()
         self.signals.job_result.emit(job)
         self.signals.manifest_changed.emit()
+
+    def _score_job(self, job, res, log_cb) -> None:
+        """Quality report for a succeeded render; never raises, never
+        blocks the queue longer than its probing takes. ``run_single_render``
+        already wrote one for real renders — score only when it did not
+        (fake/injected results, retries with a bare file, direct renders
+        from older code versions)."""
+        try:
+            qpath = res.get("quality_path")
+            mp4 = Path(res.get("mp4_path") or "")
+            if qpath and Path(qpath).is_file():
+                log_cb(f"[quality] report: {Path(qpath).name}")
+                return
+            if not mp4.is_file():
+                return
+            report = quality_service.score_render(
+                mp4, events_file=res.get("events_file"),
+                template_id=job.config.get("template_id"),
+                expected={"width": res.get("width"),
+                          "height": res.get("height"),
+                          "fps": res.get("fps"),
+                          "want_audio": bool(res.get("has_audio"))},
+                primary_color=quality_service._primary_color_from_scenario(
+                    res.get("scenario_path")))
+            path = quality_service.write_quality_report(mp4, report)
+            log_cb(f"[quality] {path.name}: {report['overall']} "
+                   f"({len(report['hard_failures'])} hard / "
+                   f"{len(report['soft_warnings'])} soft warnings)")
+        except Exception as exc:  # noqa: BLE001 - report failure must not fail job
+            log_cb(f"[quality] report skipped: {type(exc).__name__}: {exc}")
