@@ -1,10 +1,19 @@
 extends AnimatableBody3D
 ## Rotating flat barrier.
+##
+## M3.8B: rotation is derived from an accumulated PHYSICS-time counter
+## (_physics_process ticks) rather than _process wall-clock delta, so the
+## bar angle at any sim time is deterministic under both headless probes
+## (which iterate faster than real time) and Movie Maker --fixed-fps
+## renders, and stays in lockstep with vehicle physics during
+## Engine.time_scale slowmo windows. The transform is still written in
+## _process only, as required for AnimatableBody3D with sync_to_physics.
 
 const Helpers := preload("res://scripts/util/helpers.gd")
 const COLORS := preload("res://scripts/util/colors.gd")
 
 var rpm: float = 20.0
+var _phys_time: float = 0.0
 
 
 func setup(ob: Dictionary) -> void:
@@ -27,5 +36,11 @@ func setup(ob: Dictionary) -> void:
 	add_child(mi)
 
 
-func _process(delta: float) -> void:
-	rotation.y += deg_to_rad(rpm * 6.0) * delta
+func _physics_process(delta: float) -> void:
+	# delta follows the physics timeline (constant tick * time_scale),
+	# so _phys_time equals simulation time regardless of frame pacing.
+	_phys_time += delta
+
+
+func _process(_delta: float) -> void:
+	rotation.y = deg_to_rad(rpm * 6.0) * _phys_time

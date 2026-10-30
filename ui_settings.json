@@ -1,9 +1,10 @@
 {
-  "template_id": "mega_ramp",
+  "template_id": "obstacle_course",
   "aspect": "9:16",
-  "resolution": "1080p",
+  "resolution": "720p",
   "fps": 30,
   "quality": "medium",
+  "camera_style": "cinematic_auto",
   "duration": null,
   "vehicle_count": null,
   "vehicle_type": null,

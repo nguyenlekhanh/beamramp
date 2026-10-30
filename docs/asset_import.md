@@ -7,6 +7,7 @@ untouched. All behavior lives in `godot_project/scenes/asset_preview.tscn` +
 `godot_project/scripts/asset_preview/glb_preview.gd`, wrapped by
 `app/services/asset_service.py` and an "Assets (GLB preview)" group in the UI.
 
+
 ## Scope, and what a successful load does NOT prove
 
 A verdict of `loaded_with_warnings` / `loaded_visual_review_required` means the
@@ -100,3 +101,53 @@ using them in production:
    preview's origin-offset warnings).
 4. Scale should be real-world meters after export; the report's
    `local_meters_unscaled` shows what Godot measured.
+
+# External Vehicle Visual (production) - M3.6B
+
+M3.6B adds an **opt-in** way to render the production car with the imported
+GLB as its visible body. When none of the environment variables below are
+set, the factory builds the procedural car exactly as before - the pipeline
+behavior is unchanged by default.
+
+## Enabling it
+
+```bat
+:: simplest: after the asset was imported via the UI report/preview buttons
+set CRS_VEHICLE_GLB=res://assets/user_assets/my_car.glb
+
+:: optional tuning (all have safe defaults)
+set CRS_VEHICLE_GLB_SCALE=1.0       :: visual scale only, clamped 0.05..20
+set CRS_VEHICLE_GLB_YAW_DEG=0.0     :: car forward is -Z; rotate if it drives backwards
+set CRS_VEHICLE_GLB_PITCH_DEG=0.0
+set CRS_VEHICLE_GLB_AUTO_GROUND=1   :: 0 = place model origin on the car origin
+set CRS_VEHICLE_GLB_WHEELS=keep     :: hide = also hide the procedural wheels
+```
+
+From Python, `app.services.asset_service.prepare_visual_env(...)` validates,
+copies (never overwrites), imports the GLB and returns/optionally applies
+those environment keys for the next `godot_service` launch.
+
+> The GLB must already be imported by Godot (headless `--import`, done by
+> every M3.6A UI action and helper) or `load()` fails and the sim falls back.
+
+## Behavior and guarantees
+
+- `car_factory.gd` hosts the pivot `ExternalBodyVisual` under the existing
+  `RigidBody3D`; NO transform, collision shape, mass, physics or AI change is
+  ever applied to the body itself.
+- Imported GLB collision geometry (`CollisionShape3D` / bodies inside the
+  scene) is stripped and **never** attached to the production physics body.
+- Only conflicting procedural parts are hidden: shell, cabin, windows, cargo,
+  bumpers, mirrors, hood. **Lights stay**; damage rig hooks stay wired
+  (bumper/hood detachments happen on hidden parts - cosmetic no-op, the
+  physics stays untouched).
+- Procedural wheels are KEPT by default: the model's wheel layout cannot be
+  verified automatically, so a visible duplication is warned about in the log
+  (`[CRS asset] model wheel layout unverified...`). Hide them with
+  `CRS_VEHICLE_GLB_WHEELS=hide` if the model has its own wheels.
+- On any failure (missing/unimported/malformed GLB) the sim prints
+  `[CRS asset] external visual FAILED(...) - procedural fallback active` and
+  continues with the default car; the render never dies because of the asset.
+- Watch the log for `[CRS asset]` lines: which visual was selected, stripped
+  physics nodes, measured AABB, auto-ground offset, and scale warnings.
+

@@ -6,6 +6,7 @@ const COLORS := preload("res://scripts/util/colors.gd")
 const VehicleScript := preload("res://scripts/vehicles/vehicle.gd")
 const WheelScript := preload("res://scripts/vehicles/vehicle_wheel_visual.gd")
 const VehicleDamage := preload("res://scripts/vehicles/vehicle_damage.gd")
+const ExternalBodyVisualScript := preload("res://scripts/vehicles/external_body_visual.gd")
 
 const TYPE_SPECS := {
 	"sports": {
@@ -124,8 +125,22 @@ func build(spec_dict: Dictionary) -> RigidBody3D:
 	dmg.wire(car, dims, car.get_meta("bumper_front"), car.get_meta("bumper_rear"), car.get_meta("hood"))
 	car.damage = dmg
 
+	_maybe_external_body(car)
 	car.body_entered.connect(car._on_body_entered)
 	return car
+
+
+## M3.6B opt-in hook: replaces only the procedural BODY visuals with an
+## imported GLB when CRS_VEHICLE_GLB is set. Physics, collision shapes,
+## spawn logic, AI, camera, audio and events are untouched; when the env var
+## is unset (default) nothing happens at all.
+func _maybe_external_body(car: RigidBody3D) -> void:
+	if OS.get_environment("CRS_VEHICLE_GLB").strip_edges() == "":
+		return
+	var pivot: Node3D = ExternalBodyVisualScript.new()
+	pivot.name = "ExternalBodyVisual"
+	car.add_child(pivot)
+	pivot.configure(car)
 
 
 func _build_wheel(wheel: Node3D, cfg: Dictionary, wheel_color: String) -> void:
@@ -141,7 +156,12 @@ func _apply_body_visuals(car: RigidBody3D, cfg: Dictionary, dims: Vector3, paint
 	dark_mat.albedo_color = Color(0.16, 0.17, 0.2)
 	dark_mat.roughness = 0.7
 
+	# M3.6B: every procedural BODY part is registered so the external GLB
+	# visual can hide exactly these (lights and wheel visuals stay visible).
+	var parts: Array = []
+
 	var shell := MeshInstance3D.new()
+	shell.name = "ShellBody"
 	var shell_mesh := BoxMesh.new()
 	# monster sits high: shell lifted above wheels; others low
 	var shell_lift: float = absf(car.wheel_y) + cfg["wheel_radius"] * 0.7 if str(cfg.get("wheel_y", "")) != "" else dims.y * 0.35
@@ -152,6 +172,7 @@ func _apply_body_visuals(car: RigidBody3D, cfg: Dictionary, dims: Vector3, paint
 	shell.material_override = paint_mat
 	shell.position = Vector3(0, shell_lift, 0)
 	car.add_child(shell)
+	parts.append(shell)
 
 	var cabin: Array = cfg["cabin"]
 	if cabin != null:
@@ -161,27 +182,32 @@ func _apply_body_visuals(car: RigidBody3D, cfg: Dictionary, dims: Vector3, paint
 		var cabin_top: float = shell_lift + dims.y * 0.36
 		var cabin_y: float = cabin_top + cabin_h * 0.5 - 0.03
 		var cabin_mi := MeshInstance3D.new()
+		cabin_mi.name = "CabinBox"
 		var cabin_mesh := BoxMesh.new()
 		cabin_mesh.size = Vector3(dims.x * 0.92, cabin_h, cabin_len)
 		cabin_mi.mesh = cabin_mesh
 		cabin_mi.material_override = paint_mat
 		cabin_mi.position = Vector3(0, cabin_y, -dims.z * 0.12)
 		car.add_child(cabin_mi)
+		parts.append(cabin_mi)
 		var glass := StandardMaterial3D.new()
 		glass.albedo_color = Color(0.08, 0.11, 0.14)
 		glass.metallic = 0.5
 		glass.roughness = 0.12
 		var window_i := MeshInstance3D.new()
+		window_i.name = "WindowGlass"
 		var window_mesh := BoxMesh.new()
 		window_mesh.size = Vector3(dims.x * 0.86, cabin_h * 0.6, 0.06)
 		window_i.mesh = window_mesh
 		window_i.material_override = glass
 		window_i.position = Vector3(0, cabin_y, cabin_mi.position.z - cabin_len * 0.5)
 		car.add_child(window_i)
+		parts.append(window_i)
 		car.set_meta("cabin_mi", cabin_mi)
 
 	if type_of_cargo(cfg):
 		var cargo := MeshInstance3D.new()
+		cargo.name = "CargoBox"
 		var cargo_mesh := BoxMesh.new()
 		var cargo_len: float = dims.z * 0.42
 		cargo_mesh.size = Vector3(dims.x * 0.98, dims.y * 0.85, cargo_len)
@@ -189,39 +215,48 @@ func _apply_body_visuals(car: RigidBody3D, cfg: Dictionary, dims: Vector3, paint
 		cargo.material_override = paint_mat
 		cargo.position = Vector3(0, shell_lift + dims.y * 0.3, dims.z * 0.26)
 		car.add_child(cargo)
+		parts.append(cargo)
 
 	# bumpers
 	var bumper_mesh := BoxMesh.new()
 	bumper_mesh.size = Vector3(dims.x * 0.94, 0.3, 0.24)
 	var bumper_front := MeshInstance3D.new()
+	bumper_front.name = "BumperFrontMesh"
 	bumper_front.mesh = bumper_mesh
 	bumper_front.material_override = dark_mat
 	bumper_front.position = Vector3(0, shell_lift, -dims.z * 0.5)
 	car.add_child(bumper_front)
 	var bumper_rear := MeshInstance3D.new()
+	bumper_rear.name = "BumperRearMesh"
 	bumper_rear.mesh = bumper_mesh
 	bumper_rear.material_override = dark_mat
 	bumper_rear.position = Vector3(0, shell_lift, dims.z * 0.5)
 	car.add_child(bumper_rear)
+	parts.append(bumper_front)
+	parts.append(bumper_rear)
 
 	# mirrors (small wing blades) for readability
 	for side in [-1.0, 1.0]:
 		var mirror := MeshInstance3D.new()
+		mirror.name = "MirrorL" if side < 0.0 else "MirrorR"
 		var mm := BoxMesh.new()
 		mm.size = Vector3(0.1, 0.1, 0.34)
 		mirror.mesh = mm
 		mirror.material_override = dark_mat
 		mirror.position = Vector3(side * dims.x * 0.55, shell_lift + dims.y * 0.35, -dims.z * 0.18)
 		car.add_child(mirror)
+		parts.append(mirror)
 
 	# hood
 	var hood := MeshInstance3D.new()
+	hood.name = "HoodPanel"
 	var hood_mesh := BoxMesh.new()
 	hood_mesh.size = Vector3(dims.x * 0.88, 0.12, dims.z * 0.22)
 	hood.mesh = hood_mesh
 	hood.material_override = paint_mat
 	hood.position = Vector3(0, shell_lift + dims.y * 0.2, -dims.z * 0.32)
 	car.add_child(hood)
+	parts.append(hood)
 
 	# lights
 	_add_light_pair(car, Vector3(0, shell_lift + dims.y * 0.05, -dims.z * 0.49), dims, Color(1, 1, 0.85))
@@ -230,6 +265,7 @@ func _apply_body_visuals(car: RigidBody3D, cfg: Dictionary, dims: Vector3, paint
 	car.set_meta("bumper_front", bumper_front)
 	car.set_meta("bumper_rear", bumper_rear)
 	car.set_meta("hood", hood)
+	car.set_meta("proc_body_parts", parts)
 
 
 func type_of_shell_low(cfg: Dictionary) -> bool:

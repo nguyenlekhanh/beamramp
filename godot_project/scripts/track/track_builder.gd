@@ -4,6 +4,7 @@ extends Node
 signal zone_entered(zone: Dictionary, body: Node3D)
 
 const COLORS := preload("res://scripts/util/colors.gd")
+const RoadDecoScript := preload("res://scripts/environment/road_deco.gd")
 const ObstacleScripts := {
 	"hammer": preload("res://scripts/obstacles/hammer_swing.gd"),
 	"ball": preload("res://scripts/obstacles/ball_roller.gd"),
@@ -19,6 +20,42 @@ func build_all(scenario: Dictionary) -> void:
 	var layout: Dictionary = scenario.get("layout", {})
 	for seg in layout.get("road", []):
 		build_segment(seg)
+	# M3.7 opt-in decorations: off unless CRS_TRACK_DECO is set (not "0").
+	var deco_flag: String = OS.get_environment("CRS_TRACK_DECO").strip_edges()
+	if deco_flag != "" and deco_flag != "0":
+		var deco: Node3D = RoadDecoScript.new()
+		deco.name = "RoadDeco"
+		add_child(deco)
+		deco.decorate(scenario)
+	# M3.8B: spawn obstacles from the generated layout (cone+rotator).
+	_build_obstacles(layout.get("obstacles", []))
+
+
+## M3.8A/M3.8B: obstacles spawn from layout.obstacles, one type addition at
+## a time so each is validated end to end. M3.8A added the knockable cone;
+## M3.8B adds the rotator (the only mover whose animation is delta-integrated
+## in _process, so it stays in lockstep with vehicle physics under Movie
+## Maker rendering and Engine.time_scale slowmo). Heavier/wall-clock types
+## (barrier, hammer, ball, moving_platform, crash_wall) are still skipped
+## and counted. An empty obstacle list produces no log at all.
+func _build_obstacles(obs: Array) -> void:
+	if obs.is_empty():
+		return
+	var spawned := 0
+	var skipped: Dictionary = {}
+	for ob in obs:
+		var t: String = str(ob.get("type", ""))
+		if t == "cone" or t == "rotator":
+			build_obstacle(ob)
+			spawned += 1
+		else:
+			skipped[t] = true
+	var msg := "[CRS obs] %d cone/rotator obstacle(s) spawned" % spawned
+	if not skipped.is_empty():
+		msg += "; %d other obstacle(s) skipped in M3.8B (cone+rotator only; types: %s)" % [
+			obs.size() - spawned, ", ".join(skipped.keys())]
+		push_warning(msg)
+	print(msg)
 
 
 func build_segment(seg: Dictionary) -> void:
@@ -113,6 +150,8 @@ func build_obstacle(ob: Dictionary) -> void:
 		push_warning("[CRS] unknown obstacle type: " + type)
 		return
 	var inst: Node = ObstacleScripts[type].new()
+	# readable event identity: crash events record `other` = body name
+	inst.name = type.capitalize()
 	add_child(inst)
 	inst.setup(ob)
 

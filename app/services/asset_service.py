@@ -366,3 +366,62 @@ def open_preview(asset_path: str, *, scale: float = 1.0, pitch_deg: float = 0.0,
                f"(scale {scale}, yaw {yaw_deg})")
     return {"proc": proc, "copied_asset_path": str(copied),
             "source_asset_path": str(src)}
+
+
+# ---------------------------------------------------------------------------
+# M3.6B: external vehicle visual (opt-in via environment)
+# ---------------------------------------------------------------------------
+
+VISUAL_SCALE_MIN = 0.05
+VISUAL_SCALE_MAX = 20.0
+
+
+def prepare_visual_env(glb_path: str, *, scale: float = 1.0,
+                       yaw_deg: float = 0.0, pitch_deg: float = 0.0,
+                       auto_ground: bool = True, wheel_mode: str = "keep",
+                       apply: bool = False,
+                       log_cb: Optional[Callable[[str], None]] = None
+                       ) -> Dict[str, str]:
+    """Enable the external vehicle visual for production renders (M3.6B).
+
+    Validates + copy-protects (never overwrite) + IMPORTS the GLB, then
+    returns the environment dict that opts the Godot sim into using the
+    asset as the vehicle's visible body. Because godot_service builds its
+    runtime env from ``os.environ``, either pass ``apply=True`` (writes into
+    the current process env) or merge the dict manually into whatever launch
+    call you control (run_render / run_sim_probe inherit os.environ).
+
+    Keys produced: CRS_VEHICLE_GLB (res:// path of the copy), CRS_VEHICLE_GLB_SCALE
+    (clamped 0.05..20), CRS_VEHICLE_GLB_YAW_DEG, CRS_VEHICLE_GLB_PITCH_DEG,
+    CRS_VEHICLE_GLB_AUTO_GROUND, CRS_VEHICLE_GLB_WHEELS ("keep"|"hide").
+    The original GLB is never modified; scale does NOT touch the physics body.
+    """
+    if wheel_mode not in ("keep", "hide"):
+        raise AssetError(f"wheel_mode must be 'keep' or 'hide', got {wheel_mode!r}")
+    src = validate_asset(glb_path)
+    copied = copy_asset(src)
+    if log_cb:
+        log_cb(f"[asset] validated {src.name}; visual copy at {copied}")
+    imp = import_assets()
+    if not imp["ok"]:
+        raise AssetError("Godot import step failed before enabling the "
+                         "vehicle visual; log tail:\n"
+                         + "\n".join(imp["log_tail"][-25:]))
+    if log_cb:
+        log_cb(f"[asset] headless import OK ({imp['elapsed']:.1f}s)")
+    try:
+        rel = copied.resolve().relative_to(GODOT_PROJECT.resolve())
+    except ValueError as exc:  # pragma: no cover - copies always live in-project
+        raise AssetError(f"copied asset is outside the Godot project: {copied}") from exc
+    scale = min(max(float(scale), VISUAL_SCALE_MIN), VISUAL_SCALE_MAX)
+    env = {
+        "CRS_VEHICLE_GLB": "res://" + rel.as_posix(),
+        "CRS_VEHICLE_GLB_SCALE": f"{scale:g}",
+        "CRS_VEHICLE_GLB_YAW_DEG": f"{float(yaw_deg):g}",
+        "CRS_VEHICLE_GLB_PITCH_DEG": f"{float(pitch_deg):g}",
+        "CRS_VEHICLE_GLB_AUTO_GROUND": "1" if auto_ground else "0",
+        "CRS_VEHICLE_GLB_WHEELS": wheel_mode,
+    }
+    if apply:
+        os.environ.update(env)
+    return env
